@@ -1,4 +1,4 @@
-# Algotron: Algorithmic Trading Framework
+# AlgoTester: Algorithmic Trading Framework
 
 ## Features
 - Backtest strategies with customizable metrics/plots.
