@@ -1,35 +1,88 @@
 # AlgoTester: Algorithmic Trading Framework
 
-## Features
-- Backtest strategies with customizable metrics/plots.
-- Optimize parameters and resume from checkpoints.
-- Live trading with simulated execution.
+The AlgoTester Trading Framework is a Python-based backtesting and trading strategy development platform. It provides a modular structure for implementing, testing, and optimizing trading strategies using historical price data. The framework is built on top of the backtrader library and includes utilities for data fetching, backtesting, and performance analysis.
+
+## Project Structure
+├── strategies/
+│   ├── base.py                     # Base strategy class
+│   ├── buy_hold.py                 # Buy-and-hold strategy
+│   ├── static_allocation.py        # Static asset allocation strategy
+│   └── trend_following.py          # Trend-following strategies
+├── update_price_data.py            # Script to update price data
+└── utils/
+    ├── backtester.py               # Backtesting engine
+    └── data_fetcher.py             # Data fetching utilities
+
+## Key Features
+1. Modular Strategy Design:
+    - Strategies are implemented as Python classes inheriting from a base strategy class (BaseStrategy).
+    - Supports multiple asset classes and portfolio-level strategies.
+2. Backtesting Engine:
+    - Built on backtrader for efficient backtesting.
+    - Tracks portfolio performance, dividends, and position-level metrics.
+3. Data Fetching:
+    - Fetches historical price data from Yahoo Finance and macroeconomic data from FRED.
+    - Automatically updates existing datasets.
+4. Strategy Library:
+    - Includes pre-built strategies such as:
+    - Buy-and-Hold: Simple benchmark strategy.
+    - Static Allocation: Fixed-weight portfolio allocation.
+    - Trend Following: Momentum-based strategies with configurable lookback periods.
+5. Performance Metrics:
+    - Calculates key metrics such as CAGR, volatility, Sharpe ratio, and max drawdown.
+    - Visualizes portfolio performance, drawdowns, and asset-level PnL.
+
+## Getting Started
+
+### Prerequisites
+- Python 3.8+
+- Required libraries: backtrader, pandas, numpy, matplotlib, yahoo_fin, fredapi
+
+### Updating Price Data
+To update price data for existing tickers or fetch new data:
+```
+python update_price_data.py --update  # Update existing data
+python update_price_data.py --new-tickers AAPL MSFT  # Fetch new tickers
+python update_price_data.py --new-macro SP500  # Fetch new macroeconomic data
+```
+### Running a Backtest
+- Define a strategy in the strategies folder or use an existing one.
+- Use the BackTester class in utils/backtester.py to run a backtest:
+```
+from utils.backtester import BackTester
+from strategies.buy_hold import BuyHoldStrategy
+
+# Load price data
+price_data = {...}  # Dictionary of DataFrames with OHLCV data
+
+# Initialize backtester
+backtester = BackTester(price_data, cash=100000, commission=0.001)
+
+# Add strategy
+backtester.add_strategy(BuyHoldStrategy)
+
+# Run backtest
+metrics = backtester.backtest()
+
+# Plot results
+backtester.plot_results()
+```
+
+## Example Strategies
+- Buy-and-Hold:
+    - Allocates 100% of the portfolio to a single asset.
+    - No rebalancing or trading.
+- Static Allocation:
+    - Allocates fixed weights to multiple assets.
+    - Rebalances periodically (e.g., monthly).
+- Trend Following:
+    - Buys assets with positive momentum and sells assets with negative momentum.
+    - Configurable lookback periods and weighting schemes.
+
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
 
 
-## Quick Start
-- Data update:
-``` python update_price_data.py --new-tickers SPY AAPL```
-- Example Strategy
-```python
-class MovingAverageCross(bt.Strategy):
-    params = (('fast', 10), ('slow', 30))
-    def __init__(self):
-        self.fast_ma = bt.ind.SMA(period=self.p.fast)
-        self.slow_ma = bt.ind.SMA(period=self.p.slow)
-    def next(self):
-        if self.fast_ma > self.slow_ma:
-            self.buy()
-        elif self.fast_ma < self.slow_ma:
-            self.sell()
-```
-- Backtest
-```
-bt = BackTester(price_data)
-bt.add_strategy(YourStrategy)
-results = bt.backtest()
-print("Your Strategy Results:", {k: v for k, v in results.items() if k != 'returns'})
-bt.plot_results()
-```
 
 ## Development Plan & TODOs
 - ~~Implement data_fetcher.py (Yahoo/FRED).~~
@@ -40,5 +93,5 @@ bt.plot_results()
 - ~~Add static asset allocation strategy.~~
 - ~~Add trend following strategy.~~
 - ~~Add advanced trend following strategy.~~
-- Optuna hyperparameter optimization.
+- ~~Optuna hyperparameter optimization.~~
 - Add live trading

@@ -16,6 +16,8 @@ class BaseStrategy(bt.Strategy):
         self.cost_basis = {ticker: 0 for ticker in self.params.tickers}
         self.unrealized_pnl = {ticker: 0 for ticker in self.params.tickers}
         self.realized_pnl = {ticker: 0 for ticker in self.params.tickers}
+        self.position_size = {ticker: 0 for ticker in self.params.tickers}
+        self.position_value = {ticker: 0 for ticker in self.params.tickers}
 
     def _track_portfolio(self):
         """Track portfolio value and dividends"""
@@ -32,6 +34,8 @@ class BaseStrategy(bt.Strategy):
             self.broker.add_cash(asset_dividends)
 
             self.unrealized_pnl[ticker] = (data.close[0] - self.cost_basis[ticker]) * self.getposition(data).size
+            self.position_size[ticker] = self.getposition(data).size
+            self.position_value[ticker] = data.close[0] * self.getposition(data).size
 
             
 
@@ -42,6 +46,8 @@ class BaseStrategy(bt.Strategy):
             **{f"cost_basis_{ticker}": self.cost_basis[ticker] for ticker in self.params.tickers},
             **{f"unrealized_pnl_{ticker}": self.unrealized_pnl[ticker] for ticker in self.params.tickers},
             **{f"realized_pnl_{ticker}": self.realized_pnl[ticker] for ticker in self.params.tickers},
+            **{f"position_size_{ticker}": self.position_size[ticker] for ticker in self.params.tickers},
+            **{f"position_value_{ticker}": self.position_value[ticker] for ticker in self.params.tickers},
         }
         self.portfolio_tracker.append(portfolio_state)
     

@@ -135,7 +135,13 @@ class BackTester:
         axs[0].set_title('Portfolio Value')
 
         # Cumulative Returns
-        axs[1].plot(self.portfolio_tracker.index, self.portfolio_tracker['cumulative_return'])
+        axs[1].plot(self.portfolio_tracker.index, self.portfolio_tracker['cumulative_return'] + 1, label='Portfolio cumulative return')
+        if len(self.ticker_list) == 1:
+            ticker = self.ticker_list[0]
+            df_price = self.price_data[ticker]
+            df_price = df_price.loc[df_price.index.isin(self.portfolio_tracker.index)].copy()
+            axs[1].plot(df_price.index, df_price['adjclose'] / df_price['adjclose'].iloc[0], label='Asset cumulative return')
+        axs[1].legend()
         axs[1].set_title('Cumulative Returns')
         
         # Drawdowns
@@ -172,8 +178,25 @@ class BackTester:
             axs[6 + i].legend(loc='upper left')
             axs[6 + i].set_title(f'PnL {ticker}')
 
-        
-        
-        
         plt.tight_layout()
         plt.show()
+
+    def show_final_positions(self, current_capital: float, leverage: float = 1.0):
+        """Show final positions"""
+        print(f"Final Positions on date: {self.portfolio_tracker.index.to_list()[-1]}")
+        portfolio_value = self.portfolio_tracker['portfolio_value'].iloc[-1]
+        current_capital = current_capital * leverage
+        for ticker in self.ticker_list:
+            assert self.price_data[ticker].index.to_list()[-1] == self.portfolio_tracker.index.to_list()[-1]
+            position_value = self.portfolio_tracker[f'position_value_{ticker}'].iloc[-1]
+            position_weight = position_value / portfolio_value
+            expected_position_size = int(position_weight * current_capital / self.price_data[ticker].iloc[-1]['close'])
+            expected_position_value = expected_position_size * self.price_data[ticker].iloc[-1]['close']
+
+            print(ticker)
+            print(f"Position weight:    {position_weight * 100 :.2f}%")
+            print(f"Expected size:      {expected_position_size}")
+            print(f"Current price:      ${self.price_data[ticker].iloc[-1]['close']}")
+            print(f"Position value:     ${expected_position_value:.2f}")
+            
+        

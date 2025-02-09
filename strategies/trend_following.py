@@ -26,6 +26,87 @@ class TrendFollowingStrategy(BaseStrategy):
         self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
 
 
+class DualLookbackTrendFollowing(BaseStrategy):
+    """Trend following strategy with configurable lookback periods"""
+
+    params = (
+        ('fast_lookback', 21),  # Default 1-month lookback (21 trading days)
+        ('slow_lookback', 50),  # Default 4-month lookback (50 trading days)
+        ('rebound_fast_weight', 0.5),
+        ('correction_fast_weight', 0.5),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.fast_returns = bt.indicators.PercentChange(self.data.close, period=self.p.fast_lookback)
+        self.slow_returns = bt.indicators.PercentChange(self.data.close, period=self.p.slow_lookback)
+
+    def next(self):
+        super().next()
+
+        current_position = self.getposition(self.data).size
+        if self.fast_returns[0] >= 0:
+            fast_position = 1
+        else:
+            fast_position = 0
+        if self.slow_returns[0] >= 0:
+            slow_position = 1
+        else:
+            slow_position = 0
+
+        if self.fast_returns[0] >= 0 and self.slow_returns[0] < 0:
+            target_position = (self.params.rebound_fast_weight * fast_position) + ((1 - self.params.rebound_fast_weight) * slow_position)
+        elif self.fast_returns[0] < 0 and self.slow_returns[0] >= 0:
+            target_position = (self.params.correction_fast_weight * fast_position) + ((1 - self.params.correction_fast_weight) * slow_position)
+        else:
+            target_position = fast_position
+
+        target_position *= self.broker.getvalue() / self.data.close[0]
+
+        self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
+
+
+class DualPeriodSMAStrategy(BaseStrategy):
+    """Trend following strategy with configurable lookback periods"""
+    params = (
+        ('fast_lookback', 21),  # Default 1-month lookback (21 trading days)
+        ('slow_lookback', 50),  # Default 4-month lookback (50 trading days)
+        ('rebound_fast_weight', 0.5),
+        ('correction_fast_weight', 0.5),
+    )
+
+    def __init__(self):
+        super().__init__()
+        
+        self.fast_returns = bt.indicators.SMA(self.data.close, period=self.p.fast_lookback) - bt.indicators.SMA(self.data.close, period=self.p.slow_lookback)
+        self.slow_returns = bt.indicators.SMA(self.data.close, period=self.p.slow_lookback) - self.data.close
+        
+
+    def next(self):
+        super().next()
+
+        current_position = self.getposition(self.data).size
+        if self.fast_returns[0] >= 0:
+            fast_position = 1
+        else:
+            fast_position = 0
+        if self.slow_returns[0] >= 0:
+            slow_position = 1
+        else:
+            slow_position = 0
+
+        if self.fast_returns[0] >= 0 and self.slow_returns[0] < 0:
+            target_position = (self.params.rebound_fast_weight * fast_position) + ((1 - self.params.rebound_fast_weight) * slow_position)
+        elif self.fast_returns[0] < 0 and self.slow_returns[0] >= 0:
+            target_position = (self.params.correction_fast_weight * fast_position) + ((1 - self.params.correction_fast_weight) * slow_position)
+        else:
+            target_position = fast_position
+
+        target_position *= self.broker.getvalue() / self.data.close[0]
+
+        self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
+
+
 
 
 class AdvancedTrendFollowingStrategy(BaseStrategy):
@@ -150,4 +231,169 @@ class AdvancedTrendFollowingStrategy(BaseStrategy):
         return asset_atr_weights
             
 
+
+class MovingAverageCrossoverStrategy(BaseStrategy):
+    params = (
+        ('short_window', 10),  # Short-term moving average window
+        ('long_window', 50),   # Long-term moving average window
+        ('rebalance_period', 21),  # Rebalance period in days
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.sma_short = bt.indicators.SimpleMovingAverage(self.data.close, period=self.params.short_window)
+        self.sma_long = bt.indicators.SimpleMovingAverage(self.data.close, period=self.params.long_window)
+        self.rebalance_date = 0
+
+        
+    def next(self):
+        super().next()
+
+        # check if it's time to rebalance
+        if self.rebalance_date % self.params.rebalance_period == 0:
+            self.rebalance_date = 0
+
+            # find current position
+            current_position = self.getposition(self.data).size
+            if self.sma_short[0] - self.sma_long[0] >= 0:
+                target_position = self.broker.getvalue() / self.data.close[0]
+            else:
+                target_position = 0
+            
+            self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
+        
+        self.rebalance_date += 1
+
+
+
+class MultiAssetMovingAverageCrossoverStrategy(BaseStrategy):
+    params = (
+        ('ticker_list', []),
+        ('short_window', 10),  # Short-term moving average window
+        ('long_window', 50),   # Long-term moving average window
+        ('rebalance_period', 21),  # Rebalance period in days
+        ('weights', {}),  # ATR period
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.sma_short = {}
+        self.sma_long = {}
+
+        for ticker in self.params.ticker_list:
+            data = self.getdatabyname(ticker)
+            self.sma_short[ticker] = bt.indicators.SimpleMovingAverage(data.close, period=self.params.short_window)
+            self.sma_long[ticker] = bt.indicators.SimpleMovingAverage(data.close, period=self.params.long_window)
+
+        self.rebalance_date = 0
+
+    def next(self):
+        super().next()
+        # check if it's time to rebalance
+        if self.rebalance_date % self.params.rebalance_period == 0:
+            self.rebalance_date = 0
+            self.rebalance()
+        self.rebalance_date += 1
+    
+
+    def rebalance(self):
+
+        current_value = self.broker.getvalue()
+        # calculate weights based on inverse ATR
+        weights = self.params.weights
+        
+        # normalize weights
+        total_weight = sum(weights.values())
+        for ticker in self.params.ticker_list:
+            weights[ticker] /= total_weight
+        
+        # calculate target positions
+        target_positions = {}
+        for ticker in self.params.ticker_list:
+            
+            data = self.getdatabyname(ticker)
+            current_position = self.getposition(data).size
+            target_positions[ticker] = 0
+
+            if self.sma_short[ticker][0] - self.sma_long[ticker][0] >= 0:
+                target_positions[ticker] = 1
+            target_positions[ticker] = target_positions[ticker] * weights[ticker] * current_value / data.close[0]
+
+            difference = target_positions[ticker] - current_position
+            if difference != 0:
+                self._submit_order(ticker, difference, data.close[0])
+
+
+class MAMACStrategy(BaseStrategy):
+    params = (
+        ('ticker_list', []),
+        ('short_window', 21),  # Short-term moving average window
+        ('long_window', 252),   # Long-term moving average window
+        ('rebalance_period', 21),  # Rebalance period in days
+        ('weights', {}),
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.sma_short = {}
+        self.sma_long = {}
+
+        for ticker in self.params.ticker_list:
+            data = self.getdatabyname(ticker)
+            self.sma_short[ticker] = bt.indicators.SimpleMovingAverage(data.close, period=self.params.short_window)
+            self.sma_long[ticker] = bt.indicators.SimpleMovingAverage(data.close, period=self.params.long_window)
+
+        self.rebalance_date = 0
+
+    def next(self):
+        super().next()
+        # check if it's time to rebalance
+        if self.rebalance_date % self.params.rebalance_period == 0:
+            self.rebalance_date = 0
+            self.rebalance()
+        self.rebalance_date += 1
+    
+
+    def rebalance(self):
+
+        current_portfolio_value = self.broker.getvalue()
+        # calculate weights based on inverse ATR
+        weights = self.params.weights
+        
+        # normalize weights
+        total_weight = sum(weights.values())
+        for ticker in weights:
+            weights[ticker] /= total_weight
+    
+        
+        # calculate target positions
+        target_values = {}
+        target_sizes = {}
+        for ticker in self.params.ticker_list:
+            if ticker == "SHV": continue
+            
+            data = self.getdatabyname(ticker)
+            current_position = self.getposition(data).size
+            target_position = 0
+
+            if self.sma_short[ticker][0] - self.sma_long[ticker][0] >= 0:
+                target_position = 1
+            target_values[ticker] = target_position * weights[ticker] * current_portfolio_value
+
+            target_sizes[ticker] = target_values[ticker] / data.close[0]
+
+            difference = target_sizes[ticker] - current_position
+            if difference != 0:
+                self._submit_order(ticker, difference, data.close[0])
+            
+        if 'SHV' in self.params.ticker_list:
+            data = self.getdatabyname('SHV')
+            current_position = self.getposition(data).size
+            target_value = current_portfolio_value - sum(target_values.values())
+
+            target_size = target_value / data.close[0]
+            difference = target_size - current_position
+            if difference != 0:
+                self._submit_order('SHV', difference, data.close[0])
+        
 
