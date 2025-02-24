@@ -89,12 +89,13 @@ class BackTester:
         portfolio_values = self.portfolio_tracker['portfolio_value'].to_list()
         # Calculate returns and metrics
         returns = self.portfolio_tracker['portfolio_value'].pct_change().dropna()
+        returns = returns.to_frame('returns')
         cum_returns = (portfolio_values[-1] / portfolio_values[0]) - 1
         
         # Calculate metrics
         cagr = ((portfolio_values[-1] / portfolio_values[0]) ** (252 / len(portfolio_values)) - 1)
         
-        volatility = returns.std() * np.sqrt(252)
+        volatility = returns['returns'].std() * np.sqrt(252)
         sharpe = cagr / volatility if volatility != 0 else 0
         
         max_drawdown = self.portfolio_tracker['drawdown'].max()

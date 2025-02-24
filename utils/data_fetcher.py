@@ -9,6 +9,7 @@ import logging
 from datetime import datetime, timedelta
 import pandas as pd
 from yahoo_fin import stock_info as si
+import yfinance as yf
 from fredapi import Fred
 from config import FRED_API_KEY  # API key from configuration
 
@@ -34,88 +35,78 @@ os.makedirs(ARCHIVE_DIR, exist_ok=True)
 # Initialize FRED client
 fred = Fred(api_key=FRED_API_KEY)
 
+class YahooDataFetcher:
+    """Class for fetching data from Yahoo Finance"""
 
-class DataFetcher:
-    """Main class handling data fetching and updating operations"""
+    @staticmethod
+    def fetch_data_with_yahoo_fin(ticker: str) -> pd.DataFrame:
+        """Fetch OHLC data from Yahoo Finance"""
+        
+        logger.info(f"Fetching data for {ticker} with yahoo_fin")
+        df = si.get_data(ticker)
+        df = df.reset_index().rename(columns={"index": "Date"})
+        df["Date"] = pd.to_datetime(df["Date"])
+        df.index = df["Date"]
+        df = get_dividends(df)
+        return df
+
     
     @staticmethod
-    def get_last_date(file_path: str) -> datetime:
-        """Get last available date from existing data file"""
-        try:
-            df = pd.read_pickle(file_path)
-            return df["Date"].iloc[-1]
-        except (FileNotFoundError, pd.errors.EmptyDataError, KeyError):
-            return None
-
-    @staticmethod
-    def fetch_yahoo_data(ticker: str) -> pd.DataFrame:
-        """Fetch OHLC data from Yahoo Finance"""
-        try:
-            logger.info(f"Fetching Yahoo data for {ticker}")
-            df = si.get_data(ticker)
-            df = df.reset_index().rename(columns={"index": "Date"})
-            df["Date"] = pd.to_datetime(df["Date"])
-            df = get_dividends(df)
-            return df
-        except Exception as e:
-            logger.error(f"Error fetching {ticker}: {str(e)}")
-            return pd.DataFrame()
-
-    @staticmethod
-    def fetch_fred_data(series_id: str) -> pd.DataFrame:
-        """Fetch macroeconomic data from FRED"""
-        try:
-            logger.info(f"Fetching FRED data for {series_id}")
-            series = fred.get_series(series_id)
-            return series.reset_index().rename(columns={"index": "Date", 0: "Value"})
-        except Exception as e:
-            logger.error(f"Error fetching {series_id}: {str(e)}")
-            return pd.DataFrame()
-
-    def update_existing_data(self):
-        """Update all existing datasets in raw directories"""
-        self._update_price_data()
-        self._update_macro_data()
-
-    def _update_price_data(self):
-        """Update existing price data files"""
-        logger.info(f"Updating price data")
-        for file in os.listdir(PRICE_DIR):
-            if file.endswith(".pkl"):
-                ticker = file.split("_")[0]
-                file_name = f"{ticker}_{datetime.today().strftime('%Y%m%d')}.pkl"
-                file_path = os.path.join(PRICE_DIR, file_name)
-                new_data = self.fetch_yahoo_data(ticker)
-                if not new_data.empty:
-                    new_data.to_pickle(file_path)
-                    logger.info(f"Updated {ticker} with {len(new_data)} new records")
-
-
-    def _update_macro_data(self):
-        """Update existing macroeconomic data files"""
-        for file in os.listdir(MACRO_DIR):
-            if file.endswith(".pkl"):
-                series_id = file.split("_")[0]
-                file_name = f"{series_id}_{datetime.today().strftime('%Y%m%d')}.pkl"
-                file_path = os.path.join(PRICE_DIR, file_name)
-                new_data = self.fetch_fred_data(series_id)
-                if not new_data.empty:
-                    new_data.to_pickle(file_path)
-                    logger.info(f"Updated {series_id} with {len(new_data)} new records")
+    def fetch_data_with_yfinance(ticker: str) -> pd.DataFrame:
+        """Fetch OHLC data from Yahoo Finance using yfinance"""
         
+        logger.info(f"Fetching data for {ticker} with yfinance")
+        # Download historical data with yfinance
+        df = yf.Ticker(ticker).history(period='max', auto_adjust=False)
+        df.index = pd.to_datetime(df.index)
+        df.rename(
+            columns={
+                'Open': 'open',
+                'High': 'high',
+                'Low': 'low',
+                'Close': 'close',
+                'Adj Close': 'adj_close',
+                'Volume': 'volume',
+                'Dividends': 'dividends',
+                'Stock Splits': 'stock_splits',
+            }, 
+            inplace=True
+        )
+        return df
+    
+    
+    def fetch_data_from_yahoo(self, ticker: str) -> pd.DataFrame:
+        """Fetch OHLC data from Yahoo Finance"""
 
-    def load_new_price_data(self, tickers: list):
-        """Load new ticker data from Yahoo Finance"""
+        try:
+            df = self.fetch_data_with_yfinance(ticker)
+            return df
+        except:
+            df = self.fetch_data_with_yahoo_fin(ticker)
+            return df
+
+    
+    def load_price_data(self, tickers: list[str]):
+        current_date = datetime.today().strftime('%Y%m%d')
         for ticker in tickers:
+            # Fetch data
+            df = self.fetch_data_from_yahoo(ticker)
+
             # Create new file
             file_name = f"{ticker}_{datetime.today().strftime('%Y%m%d')}.pkl"
             file_path = os.path.join(PRICE_DIR, file_name)
+
+            df.to_pickle(file_path)
             
+
             # Check for existing files for this ticker
             existing_files = [f for f in os.listdir(PRICE_DIR) if f.startswith(ticker)]
             
+
             # Move existing files to archive
             for existing_file in existing_files:
+                if current_date in existing_file:
+                    continue
                 old_path = os.path.join(PRICE_DIR, existing_file)
                 archive_path = os.path.join(ARCHIVE_DIR, existing_file)
                 
@@ -128,40 +119,8 @@ class DataFetcher:
                 os.rename(old_path, archive_path)
                 logger.info(f"Moved {existing_file} to archive")
 
-            # Save new data
-            data = self.fetch_yahoo_data(ticker)
-            if not data.empty:
-                data.to_pickle(file_path)
-                logger.info(f"Saved new price data: {file_path}")
 
-    def load_new_macro_data(self, macro_series: list):
-        """Load new macroeconomic data from FRED"""
-        for series_id in macro_series:
-            file_name = f"{series_id}_{datetime.today().strftime('%Y%m%d')}.csv"
-            file_path = os.path.join(MACRO_DIR, file_name)
-            
-            if not os.path.exists(file_path):
-                data = self.fetch_fred_data(series_id)
-                if not data.empty:
-                    data.to_csv(file_path, index=False)
-                    logger.info(f"Saved new macro data: {file_path}")
 
-    def get_latest_price_data(self, ticker: str) -> pd.DataFrame:
-        """Retrieve the latest price data for a given ticker"""
-        try:
-            # Get the most recent file for the ticker
-            files = [f for f in os.listdir(PRICE_DIR) if f.startswith(ticker)]
-            if not files:
-                return pd.DataFrame()
-            
-            # Find the file with the latest date
-            latest_file = max(files, key=lambda f: datetime.strptime(f.split("_")[1].split(".")[0], "%Y%m%d"))
-            file_path = os.path.join(PRICE_DIR, latest_file)
-            
-            return pd.read_pickle(file_path)
-        except Exception as e:
-            logger.error(f"Error retrieving latest price data for {ticker}: {str(e)}")
-            return pd.DataFrame()
 
 
 def get_dividends(data: pd.DataFrame) -> pd.DataFrame:
