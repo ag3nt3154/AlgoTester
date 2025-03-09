@@ -59,16 +59,18 @@ class YahooDataFetcher:
         # Download historical data with yfinance
         df = yf.Ticker(ticker).history(period='max', auto_adjust=False)
         df.index = pd.to_datetime(df.index)
+        df.index = df.index.tz_localize(None)
         df.rename(
             columns={
                 'Open': 'open',
                 'High': 'high',
                 'Low': 'low',
                 'Close': 'close',
-                'Adj Close': 'adj_close',
+                'Adj Close': 'adjclose',
                 'Volume': 'volume',
                 'Dividends': 'dividends',
                 'Stock Splits': 'stock_splits',
+                'Capital Gains': 'capital_gains',
             }, 
             inplace=True
         )
@@ -91,6 +93,7 @@ class YahooDataFetcher:
         for ticker in tickers:
             # Fetch data
             df = self.fetch_data_from_yahoo(ticker)
+            df.index = pd.to_datetime(df.index)
 
             # Create new file
             file_name = f"{ticker}_{datetime.today().strftime('%Y%m%d')}.pkl"
