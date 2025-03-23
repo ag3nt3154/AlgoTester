@@ -95,3 +95,8 @@ This project is licensed under the MIT License. See the LICENSE file for details
 - ~~Add advanced trend following strategy.~~
 - ~~Optuna hyperparameter optimization.~~
 - Add live trading
+
+
+## Plan
+1. Data Fetching
+2. 

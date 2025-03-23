@@ -125,3 +125,55 @@ def get_cost_basis(current_cost_basis: float, current_quantity: float, new_quant
 
 
     return new_cost_basis
+
+
+
+
+
+
+class PositionDrivenRebalanceStrategy(BaseStrategy):
+    params = (
+        ('rebalance_period', 21),  # Rebalance period in days
+        ('positions_df', None),    # DataFrame containing position fractions
+    )
+
+    def __init__(self):
+        super().__init__()
+        self.rebalance_date = 0
+        
+        # Prepare positions DataFrame
+        if self.params.positions_df is not None:
+            # Convert index to datetime and sort
+            self.positions_df = self.params.positions_df.copy()
+            self.positions_df.index = pd.to_datetime(self.positions_df.index)
+            self.positions_df.sort_index(inplace=True)
+
+    def next(self):
+        super().next()
+
+        # Check if it's time to rebalance
+        if self.rebalance_date % self.params.rebalance_period == 0:
+            self.rebalance_date = 0  # Reset counter
+            
+            # Get current date from data feed
+            current_date = self.data.datetime.date()
+            
+            # Get position fraction from DataFrame (0 if not found)
+            position_fraction = 0.0
+            if self.params.positions_df is not None:
+                if current_date in self.positions_df.index:
+                    position_fraction = self.positions_df.loc[current_date, 'position']
+
+            # Calculate target position
+            current_value = self.broker.getvalue()
+            target_cash = current_value * position_fraction
+            target_position = target_cash / self.data.close[0] if self.data.close[0] else 0
+            
+            # Get current position and calculate delta
+            current_position = self.getposition(self.data).size
+            position_delta = target_position - current_position
+
+            # Submit order
+            self._submit_order(self.data._name, position_delta, self.data.close[0])
+        
+        self.rebalance_date += 1
