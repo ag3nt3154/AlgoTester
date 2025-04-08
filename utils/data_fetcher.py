@@ -57,7 +57,10 @@ class YahooDataFetcher:
         
         logger.info(f"Fetching data for {ticker} with yfinance")
         # Download historical data with yfinance
+        
         df = yf.Ticker(ticker).history(period='max', auto_adjust=False)
+        if df.shape[0] == 0:
+            df = yf.Ticker(ticker).history(period='10y', auto_adjust=False)
         df.index = pd.to_datetime(df.index)
         df.index = df.index.tz_localize(None)
         df.rename(

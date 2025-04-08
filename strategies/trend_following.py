@@ -6,24 +6,26 @@ class TrendFollowingStrategy(BaseStrategy):
     """Trend following strategy with configurable lookback period"""
     
     params = (
-        ('lookback', 21),  # Default 1-month lookback (21 trading days)
+        ('lookback_period', 21),  # Default 1-month lookback (21 trading days)
+        ('rebalance_period', 21),  # Rebalance period in days
     )
 
     def __init__(self):
         super().__init__()
-        self.returns = bt.indicators.PercentChange(self.data.close, period=self.p.lookback)
+        self.returns = bt.indicators.PercentChange(self.data.close, period=self.p.lookback_period)
+        self.rebalance_day = 0
 
         
     def next(self):
         super().next()
-        current_position = self.getposition(self.data).size
-        if self.returns[0] > 0:
-            target_position = self.broker.getvalue() / self.data.close[0]
-            
-        else:
-            target_position = 0
-        
-        self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
+        if self.rebalance_day % self.p.rebalance_period == 0:
+            current_position = self.getposition(self.data).size
+            if self.returns[0] > 0:
+                target_position = self.broker.getvalue() / self.data.close[0]
+            else:
+                target_position = -self.broker.getvalue() / self.data.close[0]
+            self._submit_order(self.data._name, target_position - current_position, self.data.close[0])
+        self.rebalance_day += 1
 
 
 class DualLookbackTrendFollowing(BaseStrategy):

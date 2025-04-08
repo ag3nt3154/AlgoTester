@@ -200,6 +200,41 @@ def main(params):
     # 2. use forward volatility to adjust trend period -> split into 2 cases -> optimize the weights of each period for each case
     #   - split_threshold (numerical)
 
+    def backtest_parameters(df_data, df_price, vol_threshold, high_vol_weights, low_vol_weights, high_vol_position_multiplier=1.0, verbose=True):
+        
+        #############################################################
+        #  Calculate position size
+        #############################################################
+        df_strat = df_data.copy()
+        if 'vol_forward_pred' not in df_strat.columns:
+            raise ValueError("vol_forward_pred column not found in df_strat")
+        for col in high_vol_weights:
+            if col not in df_strat.columns:
+                raise ValueError(f"{col} column not found in df_strat")
+        df_strat['high_vol_position'] = 0
+        for col in high_vol_weights:
+            df_strat['high_vol_position'] += df_strat[col] * high_vol_weights[col]
+        df_strat['high_vol_position'] = df_strat['high_vol_position'] * high_vol_position_multiplier
+        df_strat['low_vol_position'] = 0
+        for col in low_vol_weights:
+            df_strat['low_vol_position'] += df_strat[col] * low_vol_weights[col]
+        df_strat['position'] = np.where(df_strat['vol_forward_pred'] > vol_threshold, df_strat['high_vol_position'], df_strat['low_vol_position'])
+        
+        
+
+        # Initialize backtester
+        bt = BackTester({'SPY': df_price})
+        # Add strategy
+        bt.add_strategy(PositionDrivenRebalanceStrategy, tickers=['SPY'], price_data={'SPY': df_price}, rebalance_period=21, position_df=df_strat)
+
+        results = bt.backtest()
+        if verbose:
+            print("Buy and Hold Results:", {k: v for k, v in results.items() if k != 'returns'})
+            bt.plot_results()
+        return results['returns']
+
+
+
     trend_x_var = params['trend_following']['x_vars']
 
     # 
@@ -210,12 +245,12 @@ def main(params):
         for t in params['time_periods']:
             w = trial.suggest_float(f'w_{t}', -1, 1)
 
-        df = price_data[ticker]
+        df = df_raw.copy()
         # Initialize backtester
-        bt = BackTester({ticker: df})
+        bt = BackTester({'SPY': df})
 
         # Example 1: Buy and Hold
-        bt.add_strategy(BuyHoldStrategy, tickers=[ticker], price_data={ticker: df})
+        bt.add_strategy(PositionDrivenRebalanceStrategy, tickers=['SPY'], price_data={'SPY': df})
         results = bt.backtest()
         print("Buy and Hold Results:", {k: v for k, v in results.items() if k != 'returns'})
         bt.plot_results()
