@@ -10,7 +10,7 @@ def calculate_forward_returns(df, period=21):
     df = df.copy()
     if 'close' not in df.columns:
         raise ValueError('close column not in dataframe')
-    df['temp_returns'] = df['close'].rolling(period).apply(lambda x: (x[-1] - x[0]) / x[0])
+    df['temp_returns'] = df['close'].rolling(period).apply(lambda x: (x.iloc[-1] - x.iloc[0]) / x.iloc[0])
     df['temp_forward_returns'] = df['temp_returns'].shift(-period)
     return df['temp_forward_returns'].to_list()
 
