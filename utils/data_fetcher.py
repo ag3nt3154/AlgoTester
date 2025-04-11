@@ -13,7 +13,8 @@ import pandas as pd
 from yahoo_fin import stock_info as si
 import yfinance as yf
 from fredapi import Fred
-from config import FRED_API_KEY  # API key from configuration
+from json import JSONDecodeError
+# from config import FRED_API_KEY  # API key from configuration
 
 
 
@@ -40,7 +41,7 @@ os.makedirs(MACRO_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 
 # Initialize FRED client
-fred = Fred(api_key=FRED_API_KEY)
+# fred = Fred(api_key=FRED_API_KEY)
 
 
 
@@ -53,7 +54,7 @@ class TickerPriceDataFetcher:
     def __init__(self):
         pass
     
-    @staticmethod
+    
     def fetch_data(self, ticker:str) -> pd.DataFrame:
         """
         Fetch OHLC data for ticker
@@ -76,7 +77,11 @@ class TickerPriceDataFetcher:
         Fetch OHLC data from Yahoo Finance using yahoo_fin
         """
         logger.info(f"Fetching data for {ticker} with yahoo_fin")
-        df = si.get_data(ticker)
+        try:
+            df = si.get_data(ticker)
+        except JSONDecodeError:
+            logger.error(f"Failed to fetch data for {ticker} with yahoo_fin")
+            return pd.DataFrame()
         df = df.reset_index().rename(columns={"index": "Date"})
         df["Date"] = pd.to_datetime(df["Date"])
         df.index = df["Date"]
@@ -112,7 +117,7 @@ class TickerPriceDataFetcher:
         )
         return df
     
-    @staticmethod
+    
     def load_data(self, ticker_list: list[str]) -> dict:
         """
         Load data from ticker list
@@ -155,7 +160,7 @@ class TickerPriceDataFetcher:
         return output_data
 
         
-        
+
 ###############################################################################
 # Utility Functions
 ###############################################################################
