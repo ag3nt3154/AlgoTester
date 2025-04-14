@@ -36,7 +36,8 @@ def calculate_returns(df, period):
     Calculate returns given dataframe with close prices and period
     """
     df = df.copy()
-    df['ret'] = df['close'].rolling(period).apply(lambda x: (x[-1] - x[0]) / x[0])
+    # df['ret'] = df['close'].rolling(period).apply(lambda x: (x[-1] - x[0]) / x[0])
+    df['ret'] = df['close'].rolling(period).apply(lambda x: (x.iloc[-1] - x.iloc[0]) / x.iloc[0])
     return df['ret'].to_list()
 
 
