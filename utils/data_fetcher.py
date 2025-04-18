@@ -146,11 +146,16 @@ class TickerPriceDataFetcher:
                     os.remove(os.path.join(ARCHIVE_DIR, archive_file))
                 
                 # Move current file to archive
-                existing_file = [f for f in os.listdir(PRICE_DIR) if f.startswith(ticker)][0]
-                existing_path = os.path.join(PRICE_DIR, existing_file)
-                archive_path = os.path.join(ARCHIVE_DIR, existing_file)
-                os.rename(existing_path, archive_path)
-                logger.info(f"Moved {existing_file} to archive")
+                try:
+                    existing_file = [f for f in os.listdir(PRICE_DIR) if f.startswith(ticker)][0]
+                    existing_path = os.path.join(PRICE_DIR, existing_file)
+                    archive_path = os.path.join(ARCHIVE_DIR, existing_file)
+                    os.rename(existing_path, archive_path)
+                    logger.info(f"Moved {existing_file} to archive")
+                except IndexError:
+                    logger.error(f"No existing file for {ticker}")
+                    
+                
 
                 # Save data
                 df.to_pickle(file_path)
