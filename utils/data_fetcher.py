@@ -13,7 +13,10 @@ import pandas as pd
 from yahoo_fin import stock_info as si
 import yfinance as yf
 from fredapi import Fred
+from polygon import RESTClient
 from json import JSONDecodeError
+from config import POLYGON_API_KEY
+from tqdm.autonotebook import tqdm
 # from config import FRED_API_KEY  # API key from configuration
 
 
@@ -116,6 +119,23 @@ class TickerPriceDataFetcher:
             inplace=True
         )
         return df
+    
+    @staticmethod
+    def fetch_data_with_polygonio(ticker: str, rows: int=1000) -> pd.DataFrame:
+        """
+        Fetch OHLC data from Polygon.io
+        """
+        logger.info(f"Fetching data for {ticker} with polygon.io")
+        client = RESTClient(api_key=POLYGON_API_KEY)
+        start_date = '1900-01-01'
+        end_date = datetime.today().strftime('%Y-%m-%d')
+        estimated_iterations = int(rows / 500) + 1
+
+        for iter in tqdm(range(estimated_iterations)):
+
+
+        
+
     
     
     def load_data(self, ticker_list: list[str]) -> dict:

@@ -1,5 +1,7 @@
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
+import numpy as np
+from scipy.stats import percentileofscore
 
 def continuous_to_binary(arr, parameter, mode='percentile'):
     """
@@ -46,3 +48,59 @@ def get_train_test_split(df, n):
         })
     
     return data
+
+
+
+
+class PercentileScaler:
+    """
+    Scales data to [0, 1] based on percentiles of the fitted data.
+    
+    Methods:
+        fit(X): Compute percentiles for scaling.
+        transform(X): Scale data based on fitted percentiles.
+        fit_transform(X): Fit and transform in one step.
+    """
+    
+    def __init__(self):
+        self.reference_values = None
+    
+    def fit(self, X):
+        """
+        Compute reference percentiles from input array X.
+        
+        Args:
+            X (array-like): Input data to compute percentiles from.
+        """
+        X = np.asarray(X)
+        self.reference_values = np.sort(X.flatten())  # Store sorted values for percentile calculation
+        return self
+    
+    def transform(self, X):
+        """
+        Scale input values to [0, 1] based on fitted percentiles.
+        
+        Args:
+            X (array-like or scalar): Values to transform.
+            
+        Returns:
+            Scaled values in [0, 1].
+        """
+        if self.reference_values is None:
+            raise ValueError("Scaler has not been fitted yet. Call fit() first.")
+        
+        X = np.asarray(X)
+        is_scalar = np.isscalar(X)
+        X = np.array([X]) if is_scalar else X
+        
+        # Calculate percentile for each value
+        scaled = np.array([percentileofscore(self.reference_values, x, kind='mean') / 100.0 
+                          for x in X.flatten()])
+        
+        if is_scalar:
+            return scaled[0]
+        return scaled.reshape(X.shape)
+    
+    def fit_transform(self, X):
+        """Fit and transform in one step."""
+        return self.fit(X).transform(X)
