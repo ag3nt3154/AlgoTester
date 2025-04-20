@@ -132,7 +132,20 @@ class TickerPriceDataFetcher:
         estimated_iterations = int(rows / 500) + 1
 
         for iter in tqdm(range(estimated_iterations)):
-
+            try:
+                aggs = []
+                for a in client.list_aggs(
+                    ticker=ticker,
+                    multiplier=1,
+                    timespan='day',
+                    from_=start_date,
+                    to=end_date,
+                    limit=50000,
+                ):
+                    aggs.append(a)
+                if not aggs:
+                    print(f"No data found for {ticker} from {start_date} to {end_date}")
+            
 
         
 
