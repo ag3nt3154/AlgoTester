@@ -8,15 +8,16 @@ Handles data acquisition from Yahoo Finance and FRED API with auto-update functi
 ###############################################################################
 import os
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pandas as pd
 from yahoo_fin import stock_info as si
 import yfinance as yf
 from fredapi import Fred
 from polygon import RESTClient
 from json import JSONDecodeError
-from config import POLYGON_API_KEY
+from config.api_keys import POLYGON_API_KEY
 from tqdm.autonotebook import tqdm
+import time
 # from config import FRED_API_KEY  # API key from configuration
 
 
@@ -71,6 +72,9 @@ class TickerPriceDataFetcher:
         # if both fail, return empty dataframe
         if not validate_ticker_price_df(df):
             logger.error(f"Failed to fetch data for {ticker}")
+        if not validate_ticker_price_df(df):
+            df = self.fetch_data_with_polygonio(ticker)
+        if not validate_ticker_price_df(df):
             return None
         return df
 
@@ -121,32 +125,49 @@ class TickerPriceDataFetcher:
         return df
     
     @staticmethod
-    def fetch_data_with_polygonio(ticker: str, rows: int=1000) -> pd.DataFrame:
+    def fetch_data_with_polygonio(ticker: str) -> pd.DataFrame:
         """
         Fetch OHLC data from Polygon.io
         """
         logger.info(f"Fetching data for {ticker} with polygon.io")
         client = RESTClient(api_key=POLYGON_API_KEY)
-        start_date = '1900-01-01'
-        end_date = datetime.today().strftime('%Y-%m-%d')
-        estimated_iterations = int(rows / 500) + 1
+        end_date = datetime.today()
+        start_date = end_date - timedelta(days=1000)
+        
+        # Fetch data from Polygon.io
+        aggs = []
+        for a in client.list_aggs(
+            ticker=ticker,
+            multiplier=1,
+            timespan='day',
+            from_=start_date,
+            to=end_date,
+            limit=50000,
+        ):
+            aggs.append(a)
+        if not aggs:
+            print(f"No data found for {ticker} from {start_date} to {end_date}")
+    
+        # Convert to pandas DataFrame
+        df = pd.DataFrame([{
+            "date": datetime.fromtimestamp(agg.timestamp / 1000, timezone.utc).date(),
+            "open": agg.open,
+            "high": agg.high,
+            "low": agg.low,
+            "close": agg.close,
+            "volume": agg.volume,
+            "vwap": agg.vwap,
+            "transactions": agg.transactions
+        } for agg in aggs])
+        
+        # Sort by date (ascending)
+        df = df.sort_values("date").reset_index(drop=True)
 
-        for iter in tqdm(range(estimated_iterations)):
-            try:
-                aggs = []
-                for a in client.list_aggs(
-                    ticker=ticker,
-                    multiplier=1,
-                    timespan='day',
-                    from_=start_date,
-                    to=end_date,
-                    limit=50000,
-                ):
-                    aggs.append(a)
-                if not aggs:
-                    print(f"No data found for {ticker} from {start_date} to {end_date}")
-            
+        # Set date as index
+        # df.set_index("date", inplace=True)
+        df.index = pd.to_datetime(df['date'])
 
+        return df
         
 
     
