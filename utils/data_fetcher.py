@@ -70,11 +70,11 @@ class TickerPriceDataFetcher:
         if not validate_ticker_price_df(df):
             df = self.fetch_data_with_yahoo_fin(ticker)
         # if both fail, return empty dataframe
+        
+        # if not validate_ticker_price_df(df):
+        #     df = self.fetch_data_with_polygonio(ticker)
         if not validate_ticker_price_df(df):
             logger.error(f"Failed to fetch data for {ticker}")
-        if not validate_ticker_price_df(df):
-            df = self.fetch_data_with_polygonio(ticker)
-        if not validate_ticker_price_df(df):
             return None
         return df
 
