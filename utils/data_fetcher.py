@@ -65,7 +65,12 @@ class TickerPriceDataFetcher:
         """
         # Fetch data from Yahoo Finance
         # try yfinance first
-        df = self.fetch_data_with_yfinance(ticker)
+        df = pd.DataFrame()
+        try:
+            df = self.fetch_data_with_yfinance(ticker)
+        except Exception as e:
+            print(f"Error fetching data for {ticker} with yfinance: {e}")
+            pass
         # try yahoo_fin if yfinance fails
         if not validate_ticker_price_df(df):
             df = self.fetch_data_with_yahoo_fin(ticker)
