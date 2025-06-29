@@ -61,7 +61,7 @@ def calculate_binary_returns(df, period):
 def calculate_MA_returns(df, period):
     df = df.copy()
     df['temp_MA'] = df['close'].rolling(period).mean()
-    df['ret_MA'] = df['close'] - df['temp_MA']  
+    df['ret_MA'] = (df['close'] - df['temp_MA']) / df['temp_MA']
     return df['ret_MA'].to_list()
 
 
