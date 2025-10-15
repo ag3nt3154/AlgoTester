@@ -1,7 +1,8 @@
 import numpy as np
 from sklearn.model_selection import TimeSeriesSplit
-import numpy as np
 from scipy.stats import percentileofscore
+from scipy.optimize import nnls, lsq_linear
+from scipy.stats import linregress
 
 def continuous_to_binary(arr, parameter, mode='percentile'):
     """
@@ -104,3 +105,75 @@ class PercentileScaler:
     def fit_transform(self, X):
         """Fit and transform in one step."""
         return self.fit(X).transform(X)
+    
+
+
+def constrained_linear_regression(X, y, fit_intercept=True, constrain_intercept=False):
+    """
+    Perform linear regression with non-negative coefficients.
+    
+    Parameters:
+    X : array-like, shape (n_samples, n_features)
+        Feature matrix.
+    y : array-like, shape (n_samples,)
+        Target vector.
+    fit_intercept : bool, default=True
+        Whether to fit an intercept term.
+    constrain_intercept : bool, default=False
+        Whether to constrain the intercept to be non-negative.
+        Only relevant if fit_intercept=True.
+        
+    Returns:
+    intercept : float
+        Intercept term (0.0 if fit_intercept=False).
+    coef : ndarray, shape (n_features,)
+        Regression coefficients (non-negative).
+    """
+    X = np.array(X)
+    y = np.array(y)
+    
+    if fit_intercept:
+        # Add intercept column (all ones)
+        A = np.column_stack([np.ones(X.shape[0]), X])
+        n_features = X.shape[1]
+        
+        if constrain_intercept:
+            # Use NNLS (all coefficients >= 0)
+            coef_full, _ = nnls(A, y)
+            intercept = coef_full[0]
+            coef = coef_full[1:]
+        else:
+            # Set bounds: intercept unconstrained, others >= 0
+            # Create bounds: (lower_bounds, upper_bounds) as arrays
+            lb = [-np.inf] + [0] * n_features  # Intercept: -∞, features: 0
+            ub = [np.inf] * (n_features + 1)   # All: +∞
+            result = lsq_linear(A, y, bounds=(lb, ub))
+            coef_full = result.x
+            intercept = coef_full[0]
+            coef = coef_full[1:]
+    else:
+        # No intercept; all coefficients >= 0
+        coef, _ = nnls(X, y)
+        intercept = 0.0
+    
+    return intercept, coef
+
+
+
+def normalize_weights(weights):
+    total_weight = sum(weights.values())
+    normalized_weights = {ticker: weight / total_weight for ticker, weight in weights.items()}
+    return normalized_weights
+
+def gmean(arr):
+    return np.exp(np.mean(np.log(arr)))
+
+def hmean(arr):
+    return 1 / np.mean(1 / arr)
+
+
+def compute_r2(y):
+    x = range(len(y))
+    result = linregress(x, y)
+    r_squared = result.rvalue ** 2
+    return r_squared

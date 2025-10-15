@@ -77,3 +77,11 @@ def calculate_binary_MA_returns(df, period):
         else:
             output_arr.append(np.nan)
     return output_arr
+
+
+def calculate_relative_volume(df, period_short, period_long):
+    df = df.copy()
+    df['temp_vol_short'] = df['volume'].rolling(period_short).mean()
+    df['temp_vol_long'] = df['volume'].rolling(period_long).mean()
+    df['rel_volume'] = df['temp_vol_short'] / df['temp_vol_long']
+    return df['rel_volume'].to_list()

@@ -42,5 +42,5 @@ def calculate_forward_vol(df, period=21):
     df = df.copy()
     df['temp_ret'] = df['close'].pct_change()
     df['temp_vol'] = df['temp_ret'].rolling(period).apply(lambda x: np.std(x) * np.sqrt(252))
-    df['temp_vol'] = df['temp_vol'].shift(-period)
+    df['temp_vol'] = df['temp_vol'].shift(-period + 1)
     return df['temp_vol'].to_list()
