@@ -1,4 +1,10 @@
 {
-    "UPRO": false,
-    "SHNY": false
+    "UPRO": {
+        "status": false,
+        "date": "2025-10-18"
+    },
+    "SHNY": {
+        "status": true,
+        "date": "2025-10-28"
+    }
 }
